@@ -1,6 +1,7 @@
 import json
 import os
 import matplotlib.pyplot as plt
+import matplotlib.patches as ptc
 import numpy as np
 import bezier
 import bezier_utils as butils
@@ -103,6 +104,7 @@ class RumseyDataset:
 
         # Draw with plt
         plt.clf()
+
         image = Image.open(image_path)
         plt.imshow(image)
         # plt.show()
@@ -112,7 +114,7 @@ class RumseyDataset:
                 text = entry['text']
 
                 vertices = np.array(entry["vertices"]).reshape(-1, 2)
-                # plt.text(vertices_upper[0, 0], vertices_upper[0, 1], text, color=color, fontsize=10, ha='center', va='center')
+                plt.text(vertices[0, 0], vertices[0, 1], text, fontsize=10, ha='center', va='center')
 
                 if scatter:
                     plt.scatter(vertices[:, 0], vertices[:, 1], color=np.random.rand(3), s=2)
@@ -345,6 +347,33 @@ def get_bbox_intersection(bbox1, bbox2):
     y_max = min(y1 + h1, y2 + h2)
     return [x_min, y_min, x_max - x_min, y_max - y_min]
 
+def _longest_notnone_sequence(sequence):
+    max_length = 0
+    current_length = 0
+    start_index = -1
+    end_index = -1
+    current_start = -1
+    
+    for i in range(len(sequence)):
+        if sequence[i] is not None:
+            if current_length == 0:
+                current_start = i  # Mark the start of a new sequence of 1s
+            current_length += 1
+            
+            # Check if we found a new maximum
+            if current_length > max_length:
+                max_length = current_length
+                start_index = current_start
+                end_index = i
+        else:
+            current_length = 0  # Reset current length on encountering 0
+    
+    # Final check in case the longest sequence ends at the last element
+    if current_length > max_length:
+        start_index = current_start
+        end_index = len(sequence) - 1
+
+    return start_index, end_index
 
 def bezier_bbox_crop(bezier_pts_deg_4, bbox, segments=41, reversed=False):
     '''
@@ -369,30 +398,21 @@ def bezier_bbox_crop(bezier_pts_deg_4, bbox, segments=41, reversed=False):
     polyline_in_bbox = [p if x_min <= p[0] <= x_max and y_min <= p[1] <= y_max else None for p in polyline]
 
     # Find the first and last points that are within the bounding box
-    first_in_bbox = None
-    last_in_bbox = None
-    for i, p in enumerate(polyline_in_bbox):
-        if p is not None:
-            first_in_bbox = i
-            break
+    first_in_bbox, last_in_bbox = _longest_notnone_sequence(polyline_in_bbox)
 
     # If the polyline is completely outside the bounding box, return None
-    if first_in_bbox is None:
+    if first_in_bbox == -1:
         return None, [0, 0]
 
-    for i, p in enumerate(polyline_in_bbox[first_in_bbox:] + [None]):
-        if p is None:
-            last_in_bbox = i + first_in_bbox
-            break
-
     # If the polyline is completely inside the bounding box, return the original bezier points
-    if last_in_bbox is None:
+    if first_in_bbox == 0 and last_in_bbox == len(polyline_in_bbox)-1:
         return bezier_pts_deg_4, [0, 1]
 
     # If the polyline intersects the bounding box more than once, return None
-    if first_in_bbox != 0 and last_in_bbox != len(polyline_in_bbox) - 1:
-        return None, [0, 0]
+    #if first_in_bbox != 0 and last_in_bbox != len(polyline_in_bbox) - 1:
+    #    return None, [0, 0]
 
+    # If too short
     if last_in_bbox - first_in_bbox < 2:
         return None, [0, 0]
 
@@ -426,8 +446,8 @@ def text_range_crop(text, crop_range):
 
     length = len(text)
 
-    crop_start = math.ceil(crop_range[0] * length)
-    crop_end = math.floor(crop_range[1] * length)
+    crop_start = math.floor(crop_range[0] * length)
+    crop_end = math.ceil(crop_range[1] * length)
 
     # Crop the text
     text = text[crop_start:crop_end]
@@ -477,6 +497,7 @@ class DeepSoloDataset:
         '''
         new_images = {}
         original_m = m
+
         # Tile images
         for image_id, image in tqdm(self.images.items()):
             image_path = os.path.join(self.image_root_folder, image['file_name'])
@@ -522,6 +543,13 @@ class DeepSoloDataset:
 
         new_annos = {}
         for image_id, annos in self.annos.items():
+            # special case: the only whole map
+            if "catherwood_1835" in self.images[image_id]["file_name"]:
+                m = 6
+            elif "12148_btv1b53027745sf1_0" in self.images[image_id]["file_name"]:
+                m = 4
+            else:
+                m = original_m
             for anno in annos:
                 for h_tile_id in range(m):
                     for v_tile_id in range(m):
@@ -540,6 +568,9 @@ class DeepSoloDataset:
                         # tile_bbox = bbox_inflate(tile_bbox, 0.1)
                         orig_anno_bbox = anno['bbox']
 
+                        if Encoding.decode_text_96(anno['rec'])=='GARDEN' and new_image_id == 205:
+                            print('here1')
+
                         # if the bbox of annotation is not in the tile, skip
                         if not bbox_overlap(tile_bbox, orig_anno_bbox):
                             continue
@@ -553,10 +584,21 @@ class DeepSoloDataset:
                         new_bbox = [round(val, 2) for val in new_bbox]
 
                         if not bbox_include(tile_bbox, orig_anno_bbox):
+                            if Encoding.decode_text_96(anno['rec'])=='GARDEN' and new_image_id == 205:
+                                print('here2')
+                                #plt.plot(*butils.bezier_to_polyline(bezier_pts[0:8:2], bezier_pts[1:8:2]))
+                                #plt.plot(*butils.bezier_to_polyline(bezier_pts[8::2], bezier_pts[9::2]))
+                                #plt.plot([tile_bbox[0],tile_bbox[0]+tile_bbox[2],tile_bbox[0]+tile_bbox[2],tile_bbox[0]],
+                                #         [tile_bbox[1],tile_bbox[1],tile_bbox[1]+tile_bbox[3],tile_bbox[1]+tile_bbox[3]]
+                                #         )
+                                #plt.show()
+
                             # Crop the bezier curve to the bounding box
                             bezier_pts_upper, crop_range_upper = bezier_bbox_crop(bezier_pts[:8], tile_bbox)
                             bezier_pts_lower, crop_range_lower = bezier_bbox_crop(bezier_pts[8:], tile_bbox,
                                                                                   reversed=True)
+
+
 
                             if bezier_pts_upper is None or bezier_pts_lower is None:
                                 continue
@@ -668,7 +710,6 @@ class DeepSoloDataset:
         return image_id
 
     def _approx_bezier_v2(self, poly_upper_x, poly_upper_y, poly_lower_x, poly_lower_y):
-        import bezier_utils as butils
         cpts_upper_x, cpts_upper_y = butils.bezier_from_polyline_v2(poly_upper_x, poly_upper_y)
         # print(poly_lower_x)
         # print(poly_lower_y)
@@ -988,7 +1029,6 @@ class GrouperDataset:
         return image_id
 
     def _approx_bezier_v2(self, poly_upper_x, poly_upper_y, poly_lower_x, poly_lower_y):
-        import bezier_utils as butils
         cpts_upper_x, cpts_upper_y = butils.bezier_from_polyline_v2(poly_upper_x, poly_upper_y)
         # print(poly_lower_x)
         # print(poly_lower_y)
@@ -1029,7 +1069,6 @@ class GrouperDataset:
     #     return success, cpts_upper_x, cpts_upper_y, cpts_lower_x, cpts_lower_y
 
     def register_annotation(self, image_id, text_polygon_dict, upper_lower_split):
-        import bezier_utils as butils
         if image_id not in self.images:
             print("Image not found")
             return None
@@ -1089,8 +1128,6 @@ class GrouperDataset:
         return True
 
     def gen_font_embed(self, image_id, deepfont_encoder):
-        import DeepFont
-        import bezier_utils as butils
 
         net = deepfont_encoder
 
@@ -1135,7 +1172,6 @@ class GrouperDataset:
             self.words = {int(key): value for key, value in data['words'].items()}
 
     def draw_annotations(self, image_id, decode_text):
-        import bezier_utils as butils
         image = self.images[image_id]
         image_path = os.path.join(self.image_root_folder, image['file_name'])
         image = plt.imread(image_path)
@@ -1181,7 +1217,6 @@ class GrouperDataset:
         plt.show()
 
     def sample(self, image_id, sample_count, closest_pts_count=15, non_overlap=False):
-        import bezier_utils as butils
         samples = []
         words = self.words[image_id]
 
@@ -1260,7 +1295,6 @@ class GrouperDataset:
         '''
         words = self.words[image_id]
 
-        import bezier_utils as butils
         image = self.images[image_id]
         image_path = os.path.join(self.image_root_folder, image['file_name'])
         image = plt.imread(image_path)

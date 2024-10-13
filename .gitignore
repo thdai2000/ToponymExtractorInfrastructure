@@ -1,0 +1,13 @@
+
+/deepsolo_grouper_data/finetuning_data
+/deepsolo_grouper_data/finetuning_data_converted
+/deepsolo_grouper_data/vis
+/Results_bigcrop
+/Results_finetune
+/Results_smallcrop
+/Results_swin
+/Results_swin_finetune_1w
+/vis
+/deepsolo_grouper_data/__pycache__
+/.idea
+/.idea

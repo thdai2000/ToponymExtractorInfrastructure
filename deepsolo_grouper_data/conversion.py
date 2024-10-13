@@ -135,7 +135,7 @@ def convert_mapKurator_to_grouper(mapKurator: MapKuratorDataset, grouper, text_e
         # print(f"Processed image {image_name}, {image_id}/{len(mapKurator.images)}")
 
 
-from tqdm.notebook import tqdm
+# from tqdm.notebook import tqdm
 
 def convert_rumsey_to_deepsolo(rumsey: RumseyDataset, deep_solo: DeepSoloDataset, text_encoder):
     for i in tqdm(range(len(rumsey))):
