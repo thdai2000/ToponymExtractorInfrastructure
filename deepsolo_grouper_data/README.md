@@ -13,10 +13,10 @@ The script for preparing datasets for deepsolo model, and grouper model.
 - MapKurator humman annotations (https://knowledge-computing.github.io/mapkurator-doc/#/docs/modules/spot)
 - ICDAR 2024 MapText Competition (only "General Data from the David Rumsey Collection") (https://rrc.cvc.uab.es/?ch=28&com=downloads)
 - CVAT annotations (20240904 version) (https://github.com/epfl-timemachine/toponymics/tree/main/annotations/final)
-- all in one: https://huggingface.co/datasets/thdai2000/ToponymExtractorDatasets/blob/main/finetuning_data.zip
+- all in one: https://huggingface.co/datasets/thdai2000/ToponymExtractorDatasets/blob/main/finetuning_data.zip (this zip file contains all the original, unprocessed images)
 
 ### pre-processing procedure
-1. for ic13, ic15, mlt2017, totaltext, syntext1&2, no conversion is needed
+1. for ic13, ic15, mlt2017, totaltext, syntext1&2, no pre-processing is needed
 2. for synmap and finetuning data
    1. estimate 8 bezier curve control points for each word
    2. encode text with 96 vocab
